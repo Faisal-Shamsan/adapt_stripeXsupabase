@@ -3,7 +3,7 @@ import { z } from "zod";
 import { admin } from "@/lib/supabase/admin";
 import { HttpError, rpcData, toResponse } from "@/lib/errors";
 import { requireOwner } from "@/lib/ownership";
-import { anthropicCallModel } from "@/ai/model";
+import { callModel } from "@/ai/model";
 import { runTurn, type HistoryMessage, type TurnResult } from "@/ai/turn";
 import { TenantConfig } from "@/engine/schema";
 
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
     rpcData(await sb.rpc("append_chat", { p_tenant: tenant.id, p_role: "user", p_content: { text: body.message, images: body.images.length || undefined } }));
 
-    const result = await runTurn({ config: current, history, message: body.message, images: body.images }, anthropicCallModel);
+    const result = await runTurn({ config: current, history, message: body.message, images: body.images }, callModel());
 
     let version: number | undefined;
     if (result.type === "patch") {

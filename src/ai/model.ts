@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "@/lib/env";
 import { TOOLS } from "./tools";
+import { openAICompatCallModel } from "./openai-compat";
 
 export type ImageInput = { mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif"; dataBase64: string };
 
@@ -18,6 +19,16 @@ export type ModelResponse = { content: Array<TextBlock | ToolUseBlock>; stopReas
 export type CallModel = (req: ModelRequest) => Promise<ModelResponse>;
 
 let client: Anthropic | null = null;
+
+/** Provider chosen by AI_PROVIDER (default anthropic). Both speak the same two tools. */
+export function callModel(): CallModel {
+  const e = env();
+  if (e.AI_PROVIDER === "nebius") {
+    if (!e.NEBIUS_API_KEY) throw new Error("NEBIUS_API_KEY is not configured");
+    return openAICompatCallModel({ baseUrl: e.NEBIUS_BASE_URL, apiKey: e.NEBIUS_API_KEY, model: e.NEBIUS_MODEL });
+  }
+  return anthropicCallModel;
+}
 
 export const anthropicCallModel: CallModel = async (req) => {
   if (!client) {

@@ -9,8 +9,12 @@ const Server = z.object({
   STRIPE_CONNECT_COUNTRY: z.string().length(2).default("DE"),
   PLATFORM_FEE_BPS: z.coerce.number().int().min(0).max(10_000).default(300),
   PLATFORM_FEE_FIXED_CENTS: z.coerce.number().int().min(0).default(25),
+  AI_PROVIDER: z.enum(["anthropic", "nebius"]).default("anthropic"),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5"),
+  NEBIUS_API_KEY: z.string().optional(),
+  NEBIUS_BASE_URL: z.string().url().default("https://api.tokenfactory.nebius.com/v1/"),
+  NEBIUS_MODEL: z.string().default("moonshotai/Kimi-K2.5"),
   NEXT_PUBLIC_APP_URL: z.string().url(),
 });
 
