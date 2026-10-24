@@ -11,7 +11,6 @@ import { TenantConfig } from "@/engine/schema";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const AI_TURNS_PER_HOUR = env().AI_TURNS_PER_HOUR;
 
 const Body = z.object({
   tenantId: z.string().uuid(),
@@ -49,7 +48,7 @@ export async function POST(req: Request) {
     const { owner, tenant } = await requireOwner(body.tenantId);
     const sb = admin();
 
-    const allowed = rpcData<boolean>(await sb.rpc("consume_ai_turn", { p_tenant: tenant.id, p_limit: AI_TURNS_PER_HOUR }));
+    const allowed = rpcData<boolean>(await sb.rpc("consume_ai_turn", { p_tenant: tenant.id, p_limit: env().AI_TURNS_PER_HOUR }));
     if (!allowed) throw new HttpError(429, "too many changes in the last hour — try again shortly");
 
     const { data: row, error } = await sb.from("tenants").select("config").eq("id", tenant.id).single();
