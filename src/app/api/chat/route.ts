@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { admin } from "@/lib/supabase/admin";
+import { env } from "@/lib/env";
 import { HttpError, rpcData, toResponse } from "@/lib/errors";
 import { requireOwner } from "@/lib/ownership";
 import { callModel } from "@/ai/model";
@@ -10,7 +11,7 @@ import { TenantConfig } from "@/engine/schema";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const AI_TURNS_PER_HOUR = 30;
+const AI_TURNS_PER_HOUR = env().AI_TURNS_PER_HOUR;
 
 const Body = z.object({
   tenantId: z.string().uuid(),

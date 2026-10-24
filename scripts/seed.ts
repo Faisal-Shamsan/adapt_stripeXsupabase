@@ -10,9 +10,13 @@ import { Pool } from "pg";
 import { presets, type PresetKey } from "../src/engine/presets";
 import { TenantConfig } from "../src/engine/schema";
 
-const pool = new Pool({ connectionString: process.env["DATABASE_URL"] ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres" });
+const DB_URL = process.env["DATABASE_URL"] ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const pool = new Pool({ connectionString: DB_URL, ssl: DB_URL.includes("supabase.com") ? { rejectUnauthorized: false } : undefined });
 
-const OWNER_EMAIL = "dev@adapt.local";
+// Local default. For a hosted DB pass SEED_OWNER_EMAIL=<your sign-in email> after signing in once there,
+// so the demo tenants land on a real auth user (direct inserts into auth.users can't receive magic links).
+const OWNER_EMAIL = process.env["SEED_OWNER_EMAIL"] ?? "dev@adapt.local";
+const ALLOW_CREATE_USER = !process.env["SEED_OWNER_EMAIL"];
 const SLUGS: Record<PresetKey, string> = { gym: "pulse-spin", salon: "fringe-and-co", spa: "stillwater-spa", padel: "harbourside-padel" };
 
 async function main() {
@@ -21,6 +25,7 @@ async function main() {
     await c.query("begin");
 
     let owner = (await c.query<{ id: string }>(`select id from auth.users where email = $1`, [OWNER_EMAIL])).rows[0]?.id;
+    if (!owner && !ALLOW_CREATE_USER) throw new Error(`no auth user with email ${OWNER_EMAIL} — sign in on the site first, then re-run`);
     if (!owner) {
       owner = (
         await c.query<{ id: string }>(

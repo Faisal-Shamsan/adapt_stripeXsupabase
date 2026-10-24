@@ -18,6 +18,7 @@ const Server = z.object({
   // Comma-separated; tried in order (one attempt each) when the primary is unavailable.
   NEBIUS_FALLBACK_MODELS: z.string().default("zai-org/GLM-5.3,Qwen/Qwen3-235B-A22B-Instruct-2507"),
   NEXT_PUBLIC_APP_URL: z.string().url(),
+  AI_TURNS_PER_HOUR: z.coerce.number().int().min(1).default(120),
 });
 
 let cached: z.infer<typeof Server> | null = null;

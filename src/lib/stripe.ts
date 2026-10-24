@@ -83,6 +83,8 @@ export type CheckoutInput = {
   description: string;
   customerEmail: string;
   expiresAt: Date;
+  /** Customer's manage token: the confirmation page needs it to show the booking after Stripe redirects back. */
+  manageToken: string;
 };
 
 export function applicationFee(amountCents: number): number {
@@ -107,8 +109,8 @@ export function createCheckoutSession(input: CheckoutInput): Promise<Stripe.Chec
         },
       ],
       payment_intent_data: { application_fee_amount: applicationFee(input.dueNowCents), metadata: { booking_id: input.bookingId } },
-      success_url: `${base}/${input.tenantSlug}/booking/${input.bookingId}?paid=1`,
-      cancel_url: `${base}/${input.tenantSlug}/booking/${input.bookingId}?cancelled=1`,
+      success_url: `${base}/${input.tenantSlug}/booking/${input.bookingId}?token=${input.manageToken}&paid=1`,
+      cancel_url: `${base}/${input.tenantSlug}/booking/${input.bookingId}?token=${input.manageToken}&cancelled=1`,
     },
     { stripeAccount: input.stripeAccountId, idempotencyKey: `checkout-${input.bookingId}-${input.expiresAt.getTime()}` },
   );

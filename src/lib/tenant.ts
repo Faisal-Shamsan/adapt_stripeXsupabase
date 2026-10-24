@@ -2,6 +2,7 @@ import { cache } from "react";
 import { admin } from "./supabase/admin";
 import { TenantConfig } from "@/engine/schema";
 import { HttpError } from "./errors";
+import { maybeSyncStripe } from "./stripe-sync";
 
 export type PublicTenant = {
   id: string;
@@ -19,18 +20,19 @@ export type PublicResource = { id: string; key: string; kind: string; label: str
 export const loadPublicTenant = cache(async (slug: string): Promise<PublicTenant | null> => {
   const { data, error } = await admin()
     .from("tenants")
-    .select("id, slug, name, timezone, currency, charges_enabled, config, published")
+    .select("id, slug, name, timezone, currency, charges_enabled, stripe_account_id, stripe_synced_at, config, published")
     .eq("slug", slug)
     .maybeSingle();
   if (error) throw new HttpError(500, "internal error");
   if (!data || !data.published || !data.config) return null;
+  const synced = await maybeSyncStripe(data.id, data);
   return {
     id: data.id,
     slug: data.slug,
     name: data.name,
     timezone: data.timezone,
     currency: data.currency,
-    chargesEnabled: data.charges_enabled,
+    chargesEnabled: synced?.chargesEnabled ?? data.charges_enabled,
     config: TenantConfig.parse(data.config),
   };
 });
