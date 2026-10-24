@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Write(src/**)",
+      "Write(supabase/**)",
+      "Write(tests/**)",
+      "Write(scripts/**)",
+      "Exec(npm *)",
+      "Exec(npx tsc*)",
+      "Exec(npx vitest*)",
+      "Exec(npx supabase *)",
+      "Exec(stripe listen*)",
+      "Exec(stripe trigger*)",
+      "Exec(git status*)",
+      "Exec(git diff*)",
+      "Exec(git log*)"
+    ],
+    "ask": [
+      "Exec(git push*)",
+      "Exec(rm *)"
+    ]
+  }
+}
