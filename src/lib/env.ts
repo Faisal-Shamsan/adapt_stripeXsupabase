@@ -23,6 +23,13 @@ const Server = z.object({
 
 let cached: z.infer<typeof Server> | null = null;
 
+/** Names of required variables that are missing or invalid. Safe to expose: never includes values. */
+export function envStatus(): { ok: boolean; missing: string[] } {
+  const r = Server.safeParse(process.env);
+  if (r.success) return { ok: true, missing: [] };
+  return { ok: false, missing: [...new Set(r.error.issues.map((i) => String(i.path[0])))] };
+}
+
 /** Server-only. Throws at first use if the environment is misconfigured. */
 export function env(): z.infer<typeof Server> {
   if (cached) return cached;
