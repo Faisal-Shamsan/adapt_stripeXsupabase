@@ -1,11 +1,12 @@
 import { TOOLS } from "./tools";
+import { ModelError, isRetryableStatus } from "./errors";
 import type { CallModel, ModelMessage, ModelRequest, ModelResponse, TextBlock, ToolUseBlock } from "./model";
 
 /**
  * OpenAI-compatible chat.completions adapter (used for Nebius Token Factory). Translates our block-based
  * messages to OpenAI shape and back; tool calls become ToolUseBlocks with parsed JSON arguments.
  */
-export type OpenAICompatConfig = { baseUrl: string; apiKey: string; model: string };
+export type OpenAICompatConfig = { baseUrl: string; apiKey: string; model: string; timeoutMs?: number; retryDelayMs?: number };
 
 type OAContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 type OAMessage =
@@ -41,31 +42,74 @@ function convert(m: ModelMessage): OAMessage[] {
 }
 
 type OAResponse = {
-  choices: Array<{
+  choices?: Array<{
     finish_reason: string | null;
     message: { content: string | null; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> };
   }>;
-  error?: { message: string };
+  error?: { message?: string };
 };
+
+const MAX_ATTEMPTS = 2;
+
+/** One HTTP round-trip. Throws ModelError on non-2xx, non-JSON or network failure. */
+async function requestOnce(cfg: OpenAICompatConfig, payload: unknown): Promise<OAResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(cfg.timeoutMs ?? 60_000),
+    });
+  } catch (e) {
+    throw new ModelError("model provider unreachable", 0, true, (e as Error).message);
+  }
+
+  const text = await res.text();
+  const looksJson = (res.headers.get("content-type") ?? "").includes("json") || text.trimStart().startsWith("{");
+  let body: OAResponse | null = null;
+  if (looksJson) {
+    try {
+      body = JSON.parse(text) as OAResponse;
+    } catch {
+      body = null;
+    }
+  }
+
+  if (!res.ok) {
+    throw new ModelError(`model provider error ${res.status}`, res.status, isRetryableStatus(res.status), body?.error?.message ?? text.slice(0, 200));
+  }
+  if (!body) {
+    throw new ModelError("model provider returned a non-JSON response", res.status, true, text.slice(0, 200));
+  }
+  return body;
+}
 
 export function openAICompatCallModel(cfg: OpenAICompatConfig): CallModel {
   return async (req) => {
-    const res = await fetch(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        model: cfg.model,
-        messages: toOpenAI(req),
-        tools: TOOLS.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })),
-        tool_choice: "auto",
-        temperature: 0.2,
-        max_tokens: 8192,
-      }),
-    });
-    const body = (await res.json()) as OAResponse;
-    if (!res.ok) throw new Error(`model request failed (${res.status}): ${body.error?.message ?? "unknown error"}`);
-    const choice = body.choices[0];
-    if (!choice) throw new Error("model returned no choices");
+    const payload = {
+      model: cfg.model,
+      messages: toOpenAI(req),
+      tools: TOOLS.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })),
+      tool_choice: "auto",
+      temperature: 0.2,
+      max_tokens: 8192,
+    };
+
+    let body: OAResponse | null = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS && !body; attempt++) {
+      try {
+        body = await requestOnce(cfg, payload);
+      } catch (e) {
+        const err = e as ModelError;
+        console.error(`model provider failure (${cfg.model}) attempt ${attempt}/${MAX_ATTEMPTS}: status=${err.status} ${err.detail}`);
+        if (!(err instanceof ModelError) || !err.retryable || attempt === MAX_ATTEMPTS) throw e;
+        await new Promise((r) => setTimeout(r, cfg.retryDelayMs ?? 1_500));
+      }
+    }
+
+    const choice = body!.choices?.[0];
+    if (!choice) throw new ModelError("model returned no choices", 200, true);
 
     const content: ModelResponse["content"] = [];
     if (choice.message.content) content.push({ type: "text", text: choice.message.content });

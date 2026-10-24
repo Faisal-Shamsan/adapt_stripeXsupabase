@@ -89,7 +89,7 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
   const [text, setText] = useState("");
   const [images, setImages] = useState<{ mediaType: string; dataBase64: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; soft: boolean } | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -103,14 +103,22 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
     if (!message.trim() || busy) return;
     setBusy(true);
     setError(null);
-    setMessages((m) => [...m, { role: "user", text: message, images: images.length || undefined }]);
+    const sentImages = images;
+    setMessages((m) => [...m, { role: "user", text: message, images: sentImages.length || undefined }]);
     setText("");
-    const payload = { tenantId: tenant.id, message, images: images.map(({ mediaType, dataBase64 }) => ({ mediaType, dataBase64 })) };
     setImages([]);
+    const payload = { tenantId: tenant.id, message, images: sentImages.map(({ mediaType, dataBase64 }) => ({ mediaType, dataBase64 })) };
     try {
       const r = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-      const body = (await r.json()) as { type?: string; question?: string; chips?: string[]; summary?: string; text?: string; version?: number; error?: string; errors?: { path: string; message: string }[] };
-      if (!r.ok) throw new Error(body.error ?? "Something went wrong");
+      const body = (await r.json()) as { type?: string; question?: string; chips?: string[]; summary?: string; text?: string; version?: number; error?: string; code?: string };
+      if (!r.ok) {
+        // Give the prompt back so it can be resent as-is.
+        setMessages((m) => m.slice(0, -1));
+        setText(message);
+        setImages(sentImages);
+        setError({ message: body.error ?? "Something went wrong", soft: body.code === "MODEL_UNAVAILABLE" || r.status === 429 });
+        return;
+      }
       if (body.type === "patch") {
         setMessages((m) => [...m, { role: "assistant", text: body.summary ?? "Done.", kind: "patch" }]);
         if (body.version) onApplied(body.version);
@@ -122,7 +130,10 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
         setMessages((m) => [...m, { role: "assistant", text: body.text ?? "", kind: "message" }]);
       }
     } catch (e) {
-      setError((e as Error).message);
+      setMessages((m) => m.slice(0, -1));
+      setText(message);
+      setImages(sentImages);
+      setError({ message: (e as Error).message, soft: true });
     } finally {
       setBusy(false);
     }
@@ -180,7 +191,16 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
             </div>
           </div>
         )}
-        {error && <p className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p>}
+        {error && (
+          <div className={cx("rise flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm", error.soft ? "bg-brass/10 text-charcoal-2" : "bg-danger/10 text-danger")}>
+            <span>{error.message}</span>
+            {text.trim() && (
+              <button type="button" onClick={() => void send(text)} className="shrink-0 font-medium underline-offset-4 hover:underline">
+                Try again
+              </button>
+            )}
+          </div>
+        )}
         <div ref={bottom} />
       </div>
 

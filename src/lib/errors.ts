@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { ModelError } from "@/ai/errors";
 
 export class HttpError extends Error {
   constructor(
@@ -35,6 +36,10 @@ export function fromPg(e: PgLike): HttpError {
 
 export function toResponse(e: unknown): NextResponse {
   if (e instanceof HttpError) return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
+  if (e instanceof ModelError) {
+    console.error("model unavailable:", e.status, e.detail);
+    return NextResponse.json({ error: "The assistant is temporarily unavailable — please send that again.", code: "MODEL_UNAVAILABLE" }, { status: 503 });
+  }
   if (e instanceof ZodError) return NextResponse.json({ error: "invalid request", issues: e.issues }, { status: 400 });
   if (typeof e === "object" && e !== null && "code" in e) return toResponse(fromPg(e as PgLike));
   console.error(e);
