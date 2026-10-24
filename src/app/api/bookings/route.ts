@@ -3,7 +3,7 @@ import { z } from "zod";
 import { admin } from "@/lib/supabase/admin";
 import { HttpError, rpcData, toResponse } from "@/lib/errors";
 
-export const SLOT_STEP_MIN = 15;
+import { SLOT_STEP_MIN } from "@/lib/bookings";
 
 const Customer = {
   email: z.string().email().max(200),
