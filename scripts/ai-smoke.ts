@@ -12,6 +12,7 @@ async function main() {
     callModel(),
   );
   console.log(`turn 1 (${Date.now() - t0}ms):`, first.type, first.type === "patch" ? `${first.summary} [attempts=${first.attempts}]` : JSON.stringify(first).slice(0, 300));
+  if (first.type === "patch") console.log("  assumptions:", first.assumptions.map((a) => `${a.topic}=${a.value}${a.alternatives.length ? " (" + a.alternatives.join("/") + ")" : ""}`));
   if (first.type !== "patch") return;
   console.log("  services:", first.config.services.map((s) => `${s.key} ${s.capacityType} ${s.durationMin}min £${s.priceCents / 100}`));
   console.log("  resources:", first.config.resources.map((r) => `${r.key}:${r.kind}`).join(", "));

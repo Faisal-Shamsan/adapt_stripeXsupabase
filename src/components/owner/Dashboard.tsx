@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Button, Chip, cx, Money } from "@/components/ui";
 import { browserSupabase } from "@/lib/supabase/browser";
 
-export type ChatMessage = { role: "user" | "assistant"; text: string; kind?: string; chips?: string[]; images?: number };
+export type Assumption = { topic: string; value: string; alternatives: string[] };
+export type ChatMessage = { role: "user" | "assistant"; text: string; kind?: string; chips?: string[]; images?: number; assumptions?: Assumption[] };
 
 type Tenant = {
   id: string;
@@ -98,6 +99,7 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
   const [error, setError] = useState<{ message: string; soft: boolean } | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
@@ -116,7 +118,17 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
     const payload = { tenantId: tenant.id, message, images: sentImages.map(({ mediaType, dataBase64 }) => ({ mediaType, dataBase64 })) };
     try {
       const r = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-      const body = (await r.json()) as { type?: string; question?: string; chips?: string[]; summary?: string; text?: string; version?: number; error?: string; code?: string };
+      const body = (await r.json()) as {
+        type?: string;
+        question?: string;
+        chips?: string[];
+        summary?: string;
+        assumptions?: Assumption[];
+        text?: string;
+        version?: number;
+        error?: string;
+        code?: string;
+      };
       if (!r.ok) {
         // Give the prompt back so it can be resent as-is.
         setMessages((m) => m.slice(0, -1));
@@ -126,7 +138,7 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
         return;
       }
       if (body.type === "patch") {
-        setMessages((m) => [...m, { role: "assistant", text: body.summary ?? "Done.", kind: "patch" }]);
+        setMessages((m) => [...m, { role: "assistant", text: body.summary ?? "Done.", kind: "patch", assumptions: body.assumptions ?? [] }]);
         if (body.version) onApplied(body.version);
       } else if (body.type === "ask") {
         setMessages((m) => [...m, { role: "assistant", text: body.question ?? "", kind: "ask", chips: body.chips }]);
@@ -180,12 +192,23 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={cx("rise flex", m.role === "user" ? "justify-end" : "justify-start")}>
+          <div key={i} className={cx("rise flex flex-col", m.role === "user" ? "items-end" : "items-start")}>
             <div className={cx("max-w-[85%] rounded-3xl px-4 py-3 text-[15px] leading-relaxed", m.role === "user" ? "bg-charcoal text-ivory" : "glass text-charcoal")}>
               {m.kind === "patch" && <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.14em] text-success">Applied</span>}
               {m.text}
               {m.images ? <span className="mt-1 block text-xs opacity-60">{m.images} image(s)</span> : null}
             </div>
+            {m.assumptions && m.assumptions.length > 0 && (
+              <Assumptions
+                items={m.assumptions}
+                disabled={busy}
+                onSend={(t) => void send(t)}
+                onPrefill={(t) => {
+                  setText(t);
+                  composer.current?.focus();
+                }}
+              />
+            )}
           </div>
         ))}
         {busy && (
@@ -250,6 +273,7 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
           </button>
           <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => void addFiles(e.target.files)} />
           <textarea
+            ref={composer}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -268,6 +292,68 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
         </form>
       </div>
     </>
+  );
+}
+
+/**
+ * "What I assumed": every default the model filled in, as one-tap corrections.
+ * Tap a chip → its alternatives appear and send a ready-made change; with no alternatives the composer is pre-filled.
+ */
+function Assumptions({ items, disabled, onSend, onPrefill }: { items: Assumption[]; disabled: boolean; onSend: (text: string) => void; onPrefill: (text: string) => void }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const topicWord = (t: string) => t.trim().toLowerCase();
+  return (
+    <div className="mt-2 max-w-[85%]">
+      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-stone">What I assumed — tap to change</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((a, i) => (
+          <button
+            key={i}
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              if (a.alternatives.length) setOpen(open === i ? null : i);
+              else onPrefill(`Change the ${topicWord(a.topic)} from ${a.value} to `);
+            }}
+            className={cx(
+              "tactile glass flex items-baseline gap-1.5 rounded-full px-3 py-1.5 text-xs hover:bg-white/80 disabled:opacity-50",
+              open === i && "bg-white ring-2 ring-accent/30",
+            )}
+          >
+            <span className="text-stone">{a.topic}</span>
+            <span className="font-medium text-charcoal">{a.value}</span>
+          </button>
+        ))}
+      </div>
+      {open !== null && items[open] && (
+        <div className="rise mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-stone">Instead:</span>
+          {items[open].alternatives.map((alt) => (
+            <Chip
+              key={alt}
+              className="h-8 text-xs"
+              disabled={disabled}
+              onClick={() => {
+                setOpen(null);
+                onSend(`Change the ${topicWord(items[open]!.topic)} to ${alt}`);
+              }}
+            >
+              {alt}
+            </Chip>
+          ))}
+          <button
+            type="button"
+            className="text-xs text-stone underline-offset-4 hover:underline"
+            onClick={() => {
+              setOpen(null);
+              onPrefill(`Change the ${topicWord(items[open]!.topic)} from ${items[open]!.value} to `);
+            }}
+          >
+            something else…
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

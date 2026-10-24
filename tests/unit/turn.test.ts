@@ -43,6 +43,31 @@ describe("runTurn: tool handling", () => {
     if (r.type === "patch") expect(r.config.resources.map((x) => x.key)).toContain("court-5");
   });
 
+  it("passes structured assumptions through and defaults them to []", async () => {
+    const assumptions = [
+      { topic: "Timezone", value: "Europe/London", alternatives: ["Europe/Berlin", "Europe/Paris"] },
+      { topic: "Payment", value: "Pay in full" },
+    ];
+    const { call } = script([
+      reply(toolUse("apply_patch", { patch: [{ op: "replace", path: "/business/tagline", value: "Play." }], summary: "Tagline.", assumptions })),
+      reply(toolUse("apply_patch", { patch: [{ op: "replace", path: "/business/tagline", value: "Go." }], summary: "Tagline again." })),
+    ]);
+    const a = await runTurn({ config: padel, history: [], message: "x" }, call);
+    expect(a).toMatchObject({ type: "patch", assumptions: [assumptions[0], { ...assumptions[1], alternatives: [] }] });
+    const b = await runTurn({ config: padel, history: [], message: "y" }, call);
+    expect(b).toMatchObject({ type: "patch", assumptions: [] });
+  });
+
+  it("rejects malformed assumptions as an invalid patch (and retries)", async () => {
+    const { call, requests } = script([
+      reply(toolUse("apply_patch", { patch: [{ op: "replace", path: "/business/tagline", value: "Play." }], summary: "T.", assumptions: Array.from({ length: 9 }, () => ({ topic: "t", value: "v" })) })),
+      reply(toolUse("apply_patch", { patch: [{ op: "replace", path: "/business/tagline", value: "Play." }], summary: "T.", assumptions: [] })),
+    ]);
+    const r = await runTurn({ config: padel, history: [], message: "x" }, call);
+    expect(r).toMatchObject({ type: "patch", attempts: 2 });
+    expect(requests).toHaveLength(2);
+  });
+
   it("bootstraps a full config from null via root replace", async () => {
     const { call } = script([reply(toolUse("apply_patch", { patch: [{ op: "replace", path: "", value: presets.spa }], summary: "Set up Stillwater Spa." }))]);
     const r = await runTurn({ config: null, history: [], message: "spa with two rooms" }, call);

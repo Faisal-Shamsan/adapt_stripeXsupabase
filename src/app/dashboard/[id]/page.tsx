@@ -33,7 +33,12 @@ export default async function DashboardPage({ params, searchParams }: { params: 
         stripe: { connected: !!t.stripe_account_id, chargesEnabled: t.charges_enabled, payoutsEnabled: t.payouts_enabled, detailsSubmitted: t.details_submitted },
       }}
       ownerEmail={user.email}
-      initialChat={((chat ?? []) as { role: "user" | "assistant"; content: { text: string; kind?: string; chips?: string[]; images?: number } }[]).map((m) => ({ role: m.role, ...m.content }))}
+      initialChat={(
+        (chat ?? []) as {
+          role: "user" | "assistant";
+          content: { text: string; kind?: string; chips?: string[]; images?: number; assumptions?: { topic: string; value: string; alternatives: string[] }[] };
+        }[]
+      ).map((m) => ({ role: m.role, ...m.content }))}
       connect={sp["connect"] === "return" || sp["connect"] === "error" ? sp["connect"] : null}
     />
   );

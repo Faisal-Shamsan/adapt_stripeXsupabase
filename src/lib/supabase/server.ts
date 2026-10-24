@@ -9,7 +9,12 @@ export async function serverSupabase() {
     cookies: {
       getAll: () => store.getAll(),
       setAll: (all: { name: string; value: string; options: CookieOptions }[]) => {
-        for (const { name, value, options } of all) store.set(name, value, options);
+        try {
+          for (const { name, value, options } of all) store.set(name, value, options);
+        } catch {
+          // Called from a Server Component render, where cookies are read-only. Safe to ignore:
+          // src/middleware.ts has already refreshed the session and written the cookies for this request.
+        }
       },
     },
   });

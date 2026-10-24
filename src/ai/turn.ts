@@ -2,7 +2,7 @@ import type { TenantConfig } from "@/engine/schema";
 import { applyConfigPatch, type JsonPatch } from "@/engine/patch";
 import type { ConfigIssue } from "@/engine/schema";
 import { systemPrompt } from "./system-prompt";
-import { APPLY_PATCH, ASK_OWNER, ApplyPatchInput, AskOwnerInput } from "./tools";
+import { APPLY_PATCH, ASK_OWNER, ApplyPatchInput, AskOwnerInput, type Assumption } from "./tools";
 import type { CallModel, ImageInput, ModelMessage, ToolUseBlock } from "./model";
 
 export const HISTORY_LIMIT = 6;
@@ -20,7 +20,7 @@ export type TurnInput = {
 
 export type TurnResult =
   | { type: "ask"; question: string; chips: string[] }
-  | { type: "patch"; config: TenantConfig; patch: JsonPatch; summary: string; attempts: number }
+  | { type: "patch"; config: TenantConfig; patch: JsonPatch; summary: string; assumptions: Assumption[]; attempts: number }
   | { type: "message"; text: string }
   | { type: "invalid"; errors: ConfigIssue[]; attempts: number };
 
@@ -76,7 +76,14 @@ export async function runTurn(input: TurnInput, callModel: CallModel): Promise<T
       : ({ ok: false, stage: "patch", errors: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })) } as const);
 
     if (result.ok) {
-      return { type: "patch", config: result.config, patch: parsed.success ? (parsed.data.patch as JsonPatch) : [], summary: parsed.success ? parsed.data.summary : "", attempts: attempt };
+      return {
+        type: "patch",
+        config: result.config,
+        patch: parsed.success ? (parsed.data.patch as JsonPatch) : [],
+        summary: parsed.success ? parsed.data.summary : "",
+        assumptions: parsed.success ? parsed.data.assumptions : [],
+        attempts: attempt,
+      };
     }
 
     if (attempt === MAX_ATTEMPTS) return { type: "invalid", errors: result.errors, attempts: attempt };

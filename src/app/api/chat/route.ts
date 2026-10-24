@@ -26,7 +26,15 @@ const Body = z.object({
     .default([]),
 });
 
-type StoredContent = { text: string; images?: number; kind?: TurnResult["type"]; summary?: string; version?: number; chips?: string[] };
+type StoredContent = {
+  text: string;
+  images?: number;
+  kind?: TurnResult["type"];
+  summary?: string;
+  version?: number;
+  chips?: string[];
+  assumptions?: { topic: string; value: string; alternatives: string[] }[];
+};
 
 function historyText(role: string, content: StoredContent): HistoryMessage {
   if (role === "user") return { role: "user", text: content.images ? `${content.text}\n[${content.images} image(s) attached]` : content.text };
@@ -64,7 +72,7 @@ export async function POST(req: Request) {
 
     const assistant: StoredContent =
       result.type === "patch"
-        ? { text: result.summary, kind: "patch", summary: result.summary, version }
+        ? { text: result.summary, kind: "patch", summary: result.summary, version, assumptions: result.assumptions }
         : result.type === "ask"
           ? { text: result.question, kind: "ask", chips: result.chips }
           : result.type === "invalid"
