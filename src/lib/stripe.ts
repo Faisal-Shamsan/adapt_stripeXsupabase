@@ -17,10 +17,10 @@ export const ACCOUNT_INCLUDE: Stripe.V2.Core.AccountCreateParams.Include[] = ["c
  * Accounts v2 connected account: Express dashboard, platform collects fees and owns losses
  * (Stripe therefore collects KYC requirements). Equivalent of the v1 controller block.
  */
-export function connectedAccountParams(tenantId: string, ownerEmail: string, displayName: string): Stripe.V2.Core.AccountCreateParams {
+export function connectedAccountParams(tenantId: string, ownerEmail: string | null, displayName: string): Stripe.V2.Core.AccountCreateParams {
   return {
     display_name: displayName,
-    contact_email: ownerEmail,
+    ...(ownerEmail ? { contact_email: ownerEmail } : {}),
     dashboard: "express",
     identity: { country: env().STRIPE_CONNECT_COUNTRY.toLowerCase() },
     defaults: { responsibilities: { fees_collector: "application", losses_collector: "application" } },
@@ -33,7 +33,7 @@ export function connectedAccountParams(tenantId: string, ownerEmail: string, dis
   };
 }
 
-export function createConnectedAccount(tenantId: string, ownerEmail: string, displayName: string): Promise<Stripe.V2.Core.Account> {
+export function createConnectedAccount(tenantId: string, ownerEmail: string | null, displayName: string): Promise<Stripe.V2.Core.Account> {
   return stripe().v2.core.accounts.create(connectedAccountParams(tenantId, ownerEmail, displayName), { idempotencyKey: `acct-create-${tenantId}` });
 }
 
@@ -62,7 +62,8 @@ export function createOnboardingLink(accountId: string, tenantId: string): Promi
       type: "account_onboarding",
       account_onboarding: {
         refresh_url: `${base}/api/connect/refresh?tenant=${tenantId}`,
-        return_url: `${base}/dashboard?tenant=${tenantId}&connect=return`,
+        // The return route re-syncs account flags from Stripe before showing the dashboard (webhooks may lag or, locally, never arrive).
+        return_url: `${base}/api/connect/return?tenant=${tenantId}`,
       },
     },
   });
@@ -82,6 +83,8 @@ export type CheckoutInput = {
   description: string;
   customerEmail: string;
   expiresAt: Date;
+  /** Customer's manage token: the confirmation page needs it to show the booking after Stripe redirects back. */
+  manageToken: string;
 };
 
 export function applicationFee(amountCents: number): number {
@@ -106,8 +109,8 @@ export function createCheckoutSession(input: CheckoutInput): Promise<Stripe.Chec
         },
       ],
       payment_intent_data: { application_fee_amount: applicationFee(input.dueNowCents), metadata: { booking_id: input.bookingId } },
-      success_url: `${base}/${input.tenantSlug}/booking/${input.bookingId}?paid=1`,
-      cancel_url: `${base}/${input.tenantSlug}/booking/${input.bookingId}?cancelled=1`,
+      success_url: `${base}/${input.tenantSlug}/booking/${input.bookingId}?token=${input.manageToken}&paid=1`,
+      cancel_url: `${base}/${input.tenantSlug}/booking/${input.bookingId}?token=${input.manageToken}&cancelled=1`,
     },
     { stripeAccount: input.stripeAccountId, idempotencyKey: `checkout-${input.bookingId}-${input.expiresAt.getTime()}` },
   );

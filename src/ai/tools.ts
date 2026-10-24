@@ -9,9 +9,17 @@ export const AskOwnerInput = z.object({
 });
 export type AskOwnerInput = z.infer<typeof AskOwnerInput>;
 
+export const Assumption = z.object({
+  topic: z.string().trim().min(1).max(40),
+  value: z.string().trim().min(1).max(80),
+  alternatives: z.array(z.string().trim().min(1).max(60)).max(4).default([]),
+});
+export type Assumption = z.infer<typeof Assumption>;
+
 export const ApplyPatchInput = z.object({
   patch: z.array(z.record(z.unknown())).min(1).max(200),
   summary: z.string().min(1).max(300),
+  assumptions: z.array(Assumption).max(8).default([]),
 });
 export type ApplyPatchInput = z.infer<typeof ApplyPatchInput>;
 
@@ -52,6 +60,21 @@ export const TOOLS = [
           },
         },
         summary: { type: "string", description: "One sentence for the owner describing what changed." },
+        assumptions: {
+          type: "array",
+          maxItems: 8,
+          description:
+            "Every default you filled in that the owner did NOT state (timezone, currency, payment mode, notice, cancellation, hours you guessed, style...). Omit anything the owner said explicitly. The owner sees these as one-tap correction chips.",
+          items: {
+            type: "object",
+            properties: {
+              topic: { type: "string", description: "Short label, e.g. 'Timezone', 'Deposit', 'Cancellation'." },
+              value: { type: "string", description: "What you chose, in plain words, e.g. 'Europe/London', 'Pay in full', '24 hours'." },
+              alternatives: { type: "array", items: { type: "string" }, maxItems: 4, description: "Up to 4 likely alternatives, phrased as values, e.g. ['Europe/Berlin', 'Europe/Paris']." },
+            },
+            required: ["topic", "value"],
+          },
+        },
       },
       required: ["patch", "summary"],
       additionalProperties: false,

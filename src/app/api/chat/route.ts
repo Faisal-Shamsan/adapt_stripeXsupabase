@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { admin } from "@/lib/supabase/admin";
+import { env } from "@/lib/env";
 import { HttpError, rpcData, toResponse } from "@/lib/errors";
 import { requireOwner } from "@/lib/ownership";
-import { anthropicCallModel } from "@/ai/model";
+import { callModel } from "@/ai/model";
 import { runTurn, type HistoryMessage, type TurnResult } from "@/ai/turn";
 import { TenantConfig } from "@/engine/schema";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const AI_TURNS_PER_HOUR = 30;
+const AI_TURNS_PER_HOUR = env().AI_TURNS_PER_HOUR;
 
 const Body = z.object({
   tenantId: z.string().uuid(),
@@ -26,7 +27,15 @@ const Body = z.object({
     .default([]),
 });
 
-type StoredContent = { text: string; images?: number; kind?: TurnResult["type"]; summary?: string; version?: number };
+type StoredContent = {
+  text: string;
+  images?: number;
+  kind?: TurnResult["type"];
+  summary?: string;
+  version?: number;
+  chips?: string[];
+  assumptions?: { topic: string; value: string; alternatives: string[] }[];
+};
 
 function historyText(role: string, content: StoredContent): HistoryMessage {
   if (role === "user") return { role: "user", text: content.images ? `${content.text}\n[${content.images} image(s) attached]` : content.text };
@@ -50,9 +59,10 @@ export async function POST(req: Request) {
     const recent = rpcData<{ role: string; content: StoredContent }[]>(await sb.rpc("recent_chat", { p_tenant: tenant.id, p_limit: 6 }));
     const history = recent.map((m) => historyText(m.role, m.content));
 
-    rpcData(await sb.rpc("append_chat", { p_tenant: tenant.id, p_role: "user", p_content: { text: body.message, images: body.images.length || undefined } }));
+    // Run the model first; a provider failure must not leave a dangling user turn in the history the model sees.
+    const result = await runTurn({ config: current, history, message: body.message, images: body.images }, callModel());
 
-    const result = await runTurn({ config: current, history, message: body.message, images: body.images }, anthropicCallModel);
+    rpcData(await sb.rpc("append_chat", { p_tenant: tenant.id, p_role: "user", p_content: { text: body.message, images: body.images.length || undefined } }));
 
     let version: number | undefined;
     if (result.type === "patch") {
@@ -63,9 +73,9 @@ export async function POST(req: Request) {
 
     const assistant: StoredContent =
       result.type === "patch"
-        ? { text: result.summary, kind: "patch", summary: result.summary, version }
+        ? { text: result.summary, kind: "patch", summary: result.summary, version, assumptions: result.assumptions }
         : result.type === "ask"
-          ? { text: result.question, kind: "ask" }
+          ? { text: result.question, kind: "ask", chips: result.chips }
           : result.type === "invalid"
             ? { text: "I couldn't produce a valid configuration for that — could you rephrase or give me more detail?", kind: "invalid" }
             : { text: result.text, kind: "message" };

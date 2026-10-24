@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       description: c.description,
       customerEmail: c.customer_email,
       expiresAt: new Date(c.expires_at),
+      manageToken: token,
     });
     rpcData(await sb.rpc("set_checkout_session", { p_booking: bookingId, p_session_id: session.id }));
 

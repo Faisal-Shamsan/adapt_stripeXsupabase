@@ -9,15 +9,21 @@ export async function serverSupabase() {
     cookies: {
       getAll: () => store.getAll(),
       setAll: (all: { name: string; value: string; options: CookieOptions }[]) => {
-        for (const { name, value, options } of all) store.set(name, value, options);
+        try {
+          for (const { name, value, options } of all) store.set(name, value, options);
+        } catch {
+          // Called from a Server Component render, where cookies are read-only. Safe to ignore:
+          // src/middleware.ts has already refreshed the session and written the cookies for this request.
+        }
       },
     },
   });
 }
 
-export async function currentUser(): Promise<{ id: string; email: string } | null> {
+/** The owner for this request. Anonymous owners (created by /auth/start) have no email. */
+export async function currentUser(): Promise<{ id: string; email: string | null } | null> {
   const sb = await serverSupabase();
   const { data } = await sb.auth.getUser();
-  if (!data.user?.email) return null;
-  return { id: data.user.id, email: data.user.email };
+  if (!data.user) return null;
+  return { id: data.user.id, email: data.user.email ?? null };
 }
