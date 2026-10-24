@@ -1,0 +1,2 @@
+-- Dev-only seed. Real tenants are created via the app; presets are applied by scripts/seed.ts
+-- which runs the TypeScript validator first, then apply_config().

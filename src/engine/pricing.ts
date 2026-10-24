@@ -10,6 +10,15 @@ export function chargeFor(service: Pick<Service, "priceCents">, rules: Pick<Rule
   return { totalCents: total, dueNowCents: deposit, depositCents: deposit };
 }
 
-export function platformFee(amountCents: number, feeBps: number): number {
-  return Math.round((amountCents * feeBps) / 10_000);
+export type FeeSchedule = { bps: number; fixedCents: number };
+
+/**
+ * Platform application fee on a direct charge. The platform pays Stripe's processing fees
+ * (controller.fees.payer = "application"), so the fee has a fixed component.
+ * fee = floor(amount * bps / 10000) + fixed, capped at the amount.
+ */
+export function platformFee(amountCents: number, schedule: FeeSchedule): number {
+  if (amountCents <= 0) return 0;
+  const fee = Math.floor((amountCents * schedule.bps) / 10_000) + schedule.fixedCents;
+  return Math.min(fee, amountCents);
 }

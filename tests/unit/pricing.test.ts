@@ -16,9 +16,20 @@ describe("chargeFor", () => {
 });
 
 describe("platformFee", () => {
-  it("applies basis points", () => {
-    expect(platformFee(10000, 250)).toBe(250);
-    expect(platformFee(1050, 250)).toBe(26);
-    expect(platformFee(0, 250)).toBe(0);
+  const schedule = { bps: 300, fixedCents: 25 };
+
+  it("is floor(amount * bps) + fixed", () => {
+    expect(platformFee(10000, schedule)).toBe(325);
+    expect(platformFee(1050, schedule)).toBe(31 + 25); // floor(31.5) + 25
+    expect(platformFee(33, schedule)).toBe(0 + 25);
+  });
+
+  it("never exceeds the amount", () => {
+    expect(platformFee(10, schedule)).toBe(10);
+    expect(platformFee(25, schedule)).toBe(25);
+  });
+
+  it("is zero for a zero amount", () => {
+    expect(platformFee(0, schedule)).toBe(0);
   });
 });
