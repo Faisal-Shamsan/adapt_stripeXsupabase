@@ -14,7 +14,9 @@ const Server = z.object({
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-4-5"),
   NEBIUS_API_KEY: z.string().optional(),
   NEBIUS_BASE_URL: z.string().url().default("https://api.tokenfactory.nebius.com/v1/"),
-  NEBIUS_MODEL: z.string().default("moonshotai/Kimi-K2.5"),
+  NEBIUS_MODEL: z.string().default("moonshotai/Kimi-K2.6"),
+  // Comma-separated; tried in order (one attempt each) when the primary is unavailable.
+  NEBIUS_FALLBACK_MODELS: z.string().default("zai-org/GLM-5.3,Qwen/Qwen3-235B-A22B-Instruct-2507"),
   NEXT_PUBLIC_APP_URL: z.string().url(),
 });
 

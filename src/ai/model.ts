@@ -26,7 +26,12 @@ export function callModel(): CallModel {
   const e = env();
   if (e.AI_PROVIDER === "nebius") {
     if (!e.NEBIUS_API_KEY) throw new Error("NEBIUS_API_KEY is not configured");
-    return openAICompatCallModel({ baseUrl: e.NEBIUS_BASE_URL, apiKey: e.NEBIUS_API_KEY, model: e.NEBIUS_MODEL });
+    return openAICompatCallModel({
+      baseUrl: e.NEBIUS_BASE_URL,
+      apiKey: e.NEBIUS_API_KEY,
+      model: e.NEBIUS_MODEL,
+      fallbackModels: e.NEBIUS_FALLBACK_MODELS.split(",").map((m) => m.trim()).filter(Boolean),
+    });
   }
   return anthropicCallModel;
 }

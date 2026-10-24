@@ -55,6 +55,27 @@ describe("openAICompatCallModel", () => {
     expect(res.content).toEqual([{ type: "tool_use", id: "c1", name: "ask_owner", input: { question: "Days?", chips: ["Mon"] } }]);
   });
 
+  it("falls back to the next model after the primary is unavailable twice", async () => {
+    const { fn, calls } = stubFetch([html(503), html(503), ok({ content: "from fallback" })]);
+    const res = await openAICompatCallModel({ ...cfg, fallbackModels: ["fb1", "fb2"] })(req);
+    expect(fn).toHaveBeenCalledTimes(3);
+    expect((calls as { model: string }[]).map((c) => c.model)).toEqual(["m", "m", "fb1"]);
+    expect(res.content).toEqual([{ type: "text", text: "from fallback" }]);
+  });
+
+  it("gives each fallback one attempt and surfaces the last error when all fail", async () => {
+    const { fn } = stubFetch([html(503), html(503), html(503), json(500, { error: { message: "fb2 down" } })]);
+    const err = await openAICompatCallModel({ ...cfg, fallbackModels: ["fb1", "fb2"] })(req).catch((e: unknown) => e);
+    expect(fn).toHaveBeenCalledTimes(4);
+    expect(err as ModelError).toMatchObject({ status: 500, detail: "fb2 down" });
+  });
+
+  it("does not fall back on non-retryable errors", async () => {
+    const { fn } = stubFetch([json(400, { error: { message: "bad request" } })]);
+    await expect(openAICompatCallModel({ ...cfg, fallbackModels: ["fb1"] })(req)).rejects.toMatchObject({ status: 400 });
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps malformed tool arguments instead of crashing", async () => {
     stubFetch([ok({ content: null, tool_calls: [{ id: "c2", function: { name: "apply_patch", arguments: "{not json" } }] })]);
     const res = await openAICompatCallModel(cfg)(req);

@@ -6,7 +6,7 @@ import type { CallModel, ModelMessage, ModelRequest, ModelResponse, TextBlock, T
  * OpenAI-compatible chat.completions adapter (used for Nebius Token Factory). Translates our block-based
  * messages to OpenAI shape and back; tool calls become ToolUseBlocks with parsed JSON arguments.
  */
-export type OpenAICompatConfig = { baseUrl: string; apiKey: string; model: string; timeoutMs?: number; retryDelayMs?: number };
+export type OpenAICompatConfig = { baseUrl: string; apiKey: string; model: string; fallbackModels?: string[]; timeoutMs?: number; retryDelayMs?: number };
 
 type OAContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 type OAMessage =
@@ -96,17 +96,27 @@ export function openAICompatCallModel(cfg: OpenAICompatConfig): CallModel {
       max_tokens: 8192,
     };
 
+    // Primary model gets MAX_ATTEMPTS; if it is still unavailable, each fallback model gets one shot.
+    const models = [cfg.model, ...(cfg.fallbackModels ?? []).filter((m) => m && m !== cfg.model)];
     let body: OAResponse | null = null;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS && !body; attempt++) {
-      try {
-        body = await requestOnce(cfg, payload);
-      } catch (e) {
-        const err = e as ModelError;
-        console.error(`model provider failure (${cfg.model}) attempt ${attempt}/${MAX_ATTEMPTS}: status=${err.status} ${err.detail}`);
-        if (!(err instanceof ModelError) || !err.retryable || attempt === MAX_ATTEMPTS) throw e;
-        await new Promise((r) => setTimeout(r, cfg.retryDelayMs ?? 1_500));
+    let lastError: unknown = null;
+    for (const [i, model] of models.entries()) {
+      const attempts = i === 0 ? MAX_ATTEMPTS : 1;
+      for (let attempt = 1; attempt <= attempts && !body; attempt++) {
+        try {
+          body = await requestOnce(cfg, { ...payload, model });
+          if (i > 0) console.warn(`model fallback: served by ${model} after ${cfg.model} was unavailable`);
+        } catch (e) {
+          lastError = e;
+          const err = e as ModelError;
+          console.error(`model provider failure (${model}) attempt ${attempt}/${attempts}: status=${err.status} ${(err.detail ?? "").replace(/\s+/g, " ").slice(0, 120)}`);
+          if (!(err instanceof ModelError) || !err.retryable) throw e;
+          if (attempt < attempts) await new Promise((r) => setTimeout(r, cfg.retryDelayMs ?? 1_500));
+        }
       }
+      if (body) break;
     }
+    if (!body) throw lastError;
 
     const choice = body!.choices?.[0];
     if (!choice) throw new ModelError("model returned no choices", 200, true);
