@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewPage() {
   const user = await currentUser();
-  if (!user) redirect("/sign-in?next=/new");
+  if (!user) redirect("/auth/start?next=/new");
 
   const { data } = await admin().from("tenants").select("id, slug, name, published").eq("owner_id", user.id).order("created_at");
   const existing = data ?? [];

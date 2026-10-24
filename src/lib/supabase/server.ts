@@ -20,9 +20,10 @@ export async function serverSupabase() {
   });
 }
 
-export async function currentUser(): Promise<{ id: string; email: string } | null> {
+/** The owner for this request. Anonymous owners (created by /auth/start) have no email. */
+export async function currentUser(): Promise<{ id: string; email: string | null } | null> {
   const sb = await serverSupabase();
   const { data } = await sb.auth.getUser();
-  if (!data.user?.email) return null;
-  return { id: data.user.id, email: data.user.email };
+  if (!data.user) return null;
+  return { id: data.user.id, email: data.user.email ?? null };
 }

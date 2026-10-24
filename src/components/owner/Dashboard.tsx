@@ -22,7 +22,7 @@ type Tab = "chat" | "bookings" | "history";
 
 const STARTERS = ["I run a hair salon with three stylists", "Padel club, 4 courts, open 7am–10pm", "Spin studio with 12 bikes and two instructors", "Spa with two treatment rooms"];
 
-export function Dashboard({ tenant: initialTenant, ownerEmail, initialChat, connect }: { tenant: Tenant; ownerEmail: string; initialChat: ChatMessage[]; connect: "return" | "error" | null }) {
+export function Dashboard({ tenant: initialTenant, initialChat, connect }: { tenant: Tenant; initialChat: ChatMessage[]; connect: "return" | "error" | null }) {
   const [tenant, setTenant] = useState(initialTenant);
   const [tab, setTab] = useState<Tab>("chat");
   const [previewKey, setPreviewKey] = useState(0);
@@ -49,11 +49,9 @@ export function Dashboard({ tenant: initialTenant, ownerEmail, initialChat, conn
         <div className="flex items-center gap-2">
           <StripeButton tenant={tenant} />
           <PublishButton tenant={tenant} onChange={(published) => setTenant({ ...tenant, published })} />
-          <form action="/auth/sign-out" method="post">
-            <button className="ml-2 text-xs text-stone hover:text-charcoal" title={ownerEmail}>
-              Sign out
-            </button>
-          </form>
+          <Link href="/new" className="ml-2 text-xs text-stone hover:text-charcoal">
+            Your businesses
+          </Link>
         </div>
       </header>
 

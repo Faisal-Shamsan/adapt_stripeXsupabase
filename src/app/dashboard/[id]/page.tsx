@@ -10,7 +10,7 @@ export default async function DashboardPage({ params, searchParams }: { params: 
   const { id } = await params;
   const sp = await searchParams;
   const user = await currentUser();
-  if (!user) redirect(`/sign-in?next=/dashboard/${id}`);
+  if (!user) redirect(`/auth/start?next=/dashboard/${id}`);
 
   const sb = admin();
   const { data: t } = await sb
@@ -38,7 +38,6 @@ export default async function DashboardPage({ params, searchParams }: { params: 
         hasConfig: t.config !== null,
         stripe,
       }}
-      ownerEmail={user.email}
       initialChat={(
         (chat ?? []) as {
           role: "user" | "assistant";

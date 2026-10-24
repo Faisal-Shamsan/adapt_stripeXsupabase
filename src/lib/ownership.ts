@@ -2,7 +2,7 @@ import { admin } from "./supabase/admin";
 import { currentUser } from "./supabase/server";
 import { HttpError } from "./errors";
 
-export type Owner = { id: string; email: string };
+export type Owner = { id: string; email: string | null };
 
 export type OwnedTenant = {
   id: string;

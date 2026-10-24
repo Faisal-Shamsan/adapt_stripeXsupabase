@@ -17,10 +17,10 @@ export const ACCOUNT_INCLUDE: Stripe.V2.Core.AccountCreateParams.Include[] = ["c
  * Accounts v2 connected account: Express dashboard, platform collects fees and owns losses
  * (Stripe therefore collects KYC requirements). Equivalent of the v1 controller block.
  */
-export function connectedAccountParams(tenantId: string, ownerEmail: string, displayName: string): Stripe.V2.Core.AccountCreateParams {
+export function connectedAccountParams(tenantId: string, ownerEmail: string | null, displayName: string): Stripe.V2.Core.AccountCreateParams {
   return {
     display_name: displayName,
-    contact_email: ownerEmail,
+    ...(ownerEmail ? { contact_email: ownerEmail } : {}),
     dashboard: "express",
     identity: { country: env().STRIPE_CONNECT_COUNTRY.toLowerCase() },
     defaults: { responsibilities: { fees_collector: "application", losses_collector: "application" } },
@@ -33,7 +33,7 @@ export function connectedAccountParams(tenantId: string, ownerEmail: string, dis
   };
 }
 
-export function createConnectedAccount(tenantId: string, ownerEmail: string, displayName: string): Promise<Stripe.V2.Core.Account> {
+export function createConnectedAccount(tenantId: string, ownerEmail: string | null, displayName: string): Promise<Stripe.V2.Core.Account> {
   return stripe().v2.core.accounts.create(connectedAccountParams(tenantId, ownerEmail, displayName), { idempotencyKey: `acct-create-${tenantId}` });
 }
 

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await currentUser();
-  if (!user) redirect(`/sign-in?next=/preview/${id}`);
+  if (!user) redirect(`/auth/start?next=/preview/${id}`);
 
   const { data } = await admin().from("tenants").select("id, slug, owner_id, currency, timezone, charges_enabled, config").eq("id", id).maybeSingle();
   if (!data || data.owner_id !== user.id) notFound();
