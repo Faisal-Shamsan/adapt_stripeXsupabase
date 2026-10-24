@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { serverSupabase } from "@/lib/supabase/server";
-import { env } from "@/lib/env";
 
-export async function POST() {
+export async function POST(req: Request) {
   const sb = await serverSupabase();
   await sb.auth.signOut();
-  return NextResponse.redirect(`${env().NEXT_PUBLIC_APP_URL}/`, 303);
+  return NextResponse.redirect(new URL("/", new URL(req.url).origin), 303);
 }

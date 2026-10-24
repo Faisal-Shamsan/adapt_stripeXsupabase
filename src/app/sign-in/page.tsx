@@ -11,7 +11,9 @@ function SignInForm() {
   const next = params.get("next") ?? "/new";
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">(params.get("error") ? "error" : "idle");
-  const [message, setMessage] = useState<string | null>(params.get("error") ? "That link has expired. Request a new one." : null);
+  const [message, setMessage] = useState<string | null>(
+    params.get("error") ? `That link didn't work (${params.get("error")}). Request a new one and open it in this same browser.` : null,
+  );
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
