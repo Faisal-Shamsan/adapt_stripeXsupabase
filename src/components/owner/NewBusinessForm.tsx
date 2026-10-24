@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@/components/ui";
 
 export function NewBusinessForm() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,14 +12,16 @@ export function NewBusinessForm() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const r = await fetch("/api/tenants", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) });
-    const body = (await r.json()) as { id?: string; error?: string };
-    if (!r.ok || !body.id) {
-      setError(body.error ?? "Could not create business");
+    try {
+      const r = await fetch("/api/tenants", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) });
+      const body = (await r.json()) as { id?: string; error?: string };
+      if (!r.ok || !body.id) throw new Error(body.error ?? "Could not create business");
+      // Full navigation: the dashboard is server-rendered with the session cookie, no client transition to stall.
+      window.location.assign(`/dashboard/${body.id}`);
+    } catch (err) {
+      setError((err as Error).message);
       setBusy(false);
-      return;
     }
-    router.push(`/dashboard/${body.id}`);
   }
 
   return (

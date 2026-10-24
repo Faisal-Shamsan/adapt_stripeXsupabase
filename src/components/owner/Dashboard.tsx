@@ -93,7 +93,9 @@ function Chat({ tenant, initial, onApplied }: { tenant: Tenant; initial: ChatMes
   const bottom = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [messages, busy]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, busy]);
 
   const lastChips = messages.at(-1)?.role === "assistant" ? (messages.at(-1)?.chips ?? []) : [];
 
@@ -322,7 +324,9 @@ function History({ tenant, onRolledBack }: { tenant: Tenant; onRolledBack: (vers
     const r = await fetch(`/api/tenants/${tenant.id}/versions`);
     if (r.ok) setVersions(((await r.json()) as { versions: Version[] }).versions);
   }, [tenant.id]);
-  useEffect(() => void load(), [load, tenant.configVersion]);
+  useEffect(() => {
+    void load();
+  }, [load, tenant.configVersion]);
 
   async function rollback(v: number) {
     if (!confirm(`Restore version ${v}? This creates a new version — nothing is lost.`)) return;
