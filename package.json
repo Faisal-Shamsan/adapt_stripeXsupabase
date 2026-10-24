@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
     "test:db": "vitest run tests/db tests/stripe",
-    "test:watch": "vitest tests/unit"
+    "test:watch": "vitest tests/unit",
+    "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
