@@ -31,8 +31,19 @@ triggers: [user, model]
 7. skills resolve; only staff have skills
 
 ## Patch pipeline (`src/engine/patch.ts`)
-RFC 6902 ops (fast-json-patch, `validate=true`) → `TenantConfig.safeParse` → on failure return
-`{ ok: false, errors: [{ path, message }] }`. The AI turn retries exactly once with errors fed back.
+`applyConfigPatch(base | null, ops)`: Zod-check the ops → fast-json-patch (`validate=true`, on a clone) → `validateConfig` →
+`{ ok, config } | { ok: false, stage: "patch" | "validate", errors: [{ path, message }] }`. A null base is `{}`; the model
+bootstraps with one `{ op: "replace", path: "", value: <full config> }`.
+
+## AI turn (`src/ai/turn.ts`, pure; `CallModel` is the only network seam)
+- Tools: exactly `ask_owner(question, chips[])` and `apply_patch(patch, summary)` (`src/ai/tools.ts`). Unknown tools → plain message.
+- Sends `systemPrompt(config)` (contract + current config JSON) + last `HISTORY_LIMIT = 6` history messages (text only) + the
+  new message (images as base64 blocks before the text).
+- On invalid patch: push the assistant turn + a `tool_result` with `is_error` and the path-addressed errors, call the model again
+  once (`MAX_ATTEMPTS = 2`). Second failure → `{ type: "invalid" }`, config untouched.
+- `/api/chat` is the only place the model runs: `requireOwner` → `consume_ai_turn` (30/h sliding window) → `recent_chat` →
+  `runTurn` → on patch `apply_config(source='ai', prompt=message)` → `append_chat` both turns.
+- Tests script the model with `script([...responses])` (`tests/unit/turn.test.ts`) and assert the exact request contents.
 
 ## apply_config (Postgres)
 `apply_config(p_tenant uuid, p_owner uuid, p_config jsonb, p_source text, p_prompt text)` SECURITY DEFINER:

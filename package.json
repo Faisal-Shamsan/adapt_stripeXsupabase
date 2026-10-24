@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
-    "test:db": "vitest run tests/db",
+    "test:db": "vitest run tests/db tests/stripe",
     "test:watch": "vitest tests/unit"
   },
   "dependencies": {
@@ -21,7 +21,7 @@
     "next": "15.5.27",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "stripe": "^17.7.0",
+    "stripe": "^23.0.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
