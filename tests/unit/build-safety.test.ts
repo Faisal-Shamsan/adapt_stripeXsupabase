@@ -34,6 +34,16 @@ afterEach(() => {
   for (const k of SECRETS) if (saved[k] !== undefined) process.env[k] = saved[k];
 });
 
+describe("middleware without environment", () => {
+  it("passes the request through instead of throwing", async () => {
+    const { middleware } = await import("@/middleware");
+    const { NextRequest } = await import("next/server");
+    const res = await middleware(new NextRequest("http://localhost:3000/some-page"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-middleware-next")).toBe("1");
+  });
+});
+
 describe("app modules import without environment", () => {
   expect(modules.length).toBeGreaterThan(10);
   for (const file of modules) {
