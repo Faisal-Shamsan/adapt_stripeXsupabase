@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Button, Display, Eyebrow } from "@/components/ui";
 
-export default function Landing() {
+export default async function Landing({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  // If Supabase falls back to the site root for an auth redirect, finish the sign-in anyway.
+  const code = (await searchParams)["code"];
+  if (code) redirect(`/auth/callback?code=${encodeURIComponent(code)}&next=/new`);
   return (
     <main className="mx-auto flex min-h-dvh max-w-5xl flex-col px-6 py-10 md:px-10">
       <header className="flex items-center justify-between">
