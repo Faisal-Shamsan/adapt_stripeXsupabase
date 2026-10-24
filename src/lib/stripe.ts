@@ -62,7 +62,8 @@ export function createOnboardingLink(accountId: string, tenantId: string): Promi
       type: "account_onboarding",
       account_onboarding: {
         refresh_url: `${base}/api/connect/refresh?tenant=${tenantId}`,
-        return_url: `${base}/dashboard?tenant=${tenantId}&connect=return`,
+        // The return route re-syncs account flags from Stripe before showing the dashboard (webhooks may lag or, locally, never arrive).
+        return_url: `${base}/api/connect/return?tenant=${tenantId}`,
       },
     },
   });

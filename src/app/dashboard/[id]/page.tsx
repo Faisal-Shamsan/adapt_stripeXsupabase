@@ -34,7 +34,7 @@ export default async function DashboardPage({ params, searchParams }: { params: 
       }}
       ownerEmail={user.email}
       initialChat={((chat ?? []) as { role: "user" | "assistant"; content: { text: string; kind?: string; chips?: string[]; images?: number } }[]).map((m) => ({ role: m.role, ...m.content }))}
-      connectReturned={sp["connect"] === "return"}
+      connect={sp["connect"] === "return" || sp["connect"] === "error" ? sp["connect"] : null}
     />
   );
 }

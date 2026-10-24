@@ -25,7 +25,8 @@ stripe.v2.core.accounts.create({
   status active), `payouts_enabled` (stripe_balance.payouts active) and `details_submitted` (no currently_due/past_due entries).
   Always retrieve with `include: ACCOUNT_INCLUDE` or those fields are absent.
 - Onboarding: `v2.core.accountLinks.create({ account, use_case: { type: "account_onboarding", account_onboarding: { refresh_url, return_url } } })`.
-  `/api/connect/refresh` regenerates. "View payouts" `/api/connect/payouts` uses the v1 `accounts.createLoginLink` (works for v2
+  `/api/connect/refresh` regenerates. `return_url` is `/api/connect/return`, which re-fetches the account and calls
+  `sync_stripe_account()` before redirecting to the dashboard — webhooks never reach localhost and may lag in prod. "View payouts" `/api/connect/payouts` uses the v1 `accounts.createLoginLink` (works for v2
   accounts) and is gated on `details_submitted && charges_enabled`.
 - `scripts/stripe-check.ts` creates, links and closes a throwaway account — run it after any change to the params.
 

@@ -21,7 +21,7 @@ type Tab = "chat" | "bookings" | "history";
 
 const STARTERS = ["I run a hair salon with three stylists", "Padel club, 4 courts, open 7am–10pm", "Spin studio with 12 bikes and two instructors", "Spa with two treatment rooms"];
 
-export function Dashboard({ tenant: initialTenant, ownerEmail, initialChat, connectReturned }: { tenant: Tenant; ownerEmail: string; initialChat: ChatMessage[]; connectReturned: boolean }) {
+export function Dashboard({ tenant: initialTenant, ownerEmail, initialChat, connect }: { tenant: Tenant; ownerEmail: string; initialChat: ChatMessage[]; connect: "return" | "error" | null }) {
   const [tenant, setTenant] = useState(initialTenant);
   const [tab, setTab] = useState<Tab>("chat");
   const [previewKey, setPreviewKey] = useState(0);
@@ -56,8 +56,14 @@ export function Dashboard({ tenant: initialTenant, ownerEmail, initialChat, conn
         </div>
       </header>
 
-      {connectReturned && (
-        <p className="bg-success/10 px-5 py-2 text-center text-sm text-success">Thanks — Stripe is checking your details. Payments switch on automatically when they&apos;re approved.</p>
+      {connect === "return" && tenant.stripe.chargesEnabled && (
+        <p className="bg-success/10 px-5 py-2 text-center text-sm text-success">Payments are on — your customers can book and pay.</p>
+      )}
+      {connect === "return" && !tenant.stripe.chargesEnabled && (
+        <p className="bg-brass/10 px-5 py-2 text-center text-sm text-charcoal-2">Thanks — Stripe is checking your details. Payments switch on automatically when they&apos;re approved.</p>
+      )}
+      {connect === "error" && (
+        <p className="bg-danger/10 px-5 py-2 text-center text-sm text-danger">We couldn&apos;t confirm your Stripe status just now — use &ldquo;Finish Stripe setup&rdquo; to try again.</p>
       )}
 
       <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(380px,2fr)_3fr]">
